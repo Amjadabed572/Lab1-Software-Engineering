@@ -3,7 +3,8 @@ package com.example.demo;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
-import java.util.Collections;
+//import java.util.Collections;
+import java.util.Comparator;
 import java.util.Scanner;
 
 public class UsersApp {
@@ -44,7 +45,7 @@ public class UsersApp {
         }
 
         // Sort the valid users alphabetically by their username (Email)
-        Collections.sort(users, (u1, u2) -> u1.getUsername().compareTo(u2.getUsername()));
+        users.sort(Comparator.comparing(User::getUsername));
 
         // Print the sorted array of valid users
         for (User user : users) {
