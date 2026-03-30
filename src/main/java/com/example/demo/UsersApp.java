@@ -49,7 +49,7 @@ public class UsersApp {
 
         // Print the sorted array of valid users
         for (User user : users) {
-            System.out.println(user.toString());
+            System.out.print(user.toString() + "\n");
         }
     }
 }
