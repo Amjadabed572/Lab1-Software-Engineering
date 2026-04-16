@@ -7,7 +7,7 @@ import java.util.Comparator;
 import java.util.Scanner;
 
 /**
- * UsersApp reads user data from a file, validates and creates User objects,
+ *  UsersApp reads user data from a file, validates and creates User objects,
  * sorts them alphabetically by username, and prints the results.
  * This is a simple console application for processing user lists.
  */
