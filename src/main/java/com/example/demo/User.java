@@ -55,6 +55,10 @@ public class User {
         return username;
     }
 
+    public String getPassword() {
+        return password;
+    }
+
     /**
      * Returns a string representation of the user.
      *
