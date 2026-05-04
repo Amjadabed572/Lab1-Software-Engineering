@@ -3,10 +3,8 @@ package com.example.demo;
 import java.util.ArrayList;
 
 /**
- * In charge of keeping up with the number of failed login attempts
- * and blocking the user with max failed attempt for t time,
- * this is divided into two threads:
- * Thread 1: counts the failed attempts and blocks users with max failed attempts.
+ * Manages the number of login attempts and blocking the user with max failed attempt for t time.
+ * Thread 1: Manages counting the failed attempts and blocks users with max failed attempts.
  * Thread 2: Checks if a user trying to login is blocked before allowing access.
  */
 public class LoginManager {
@@ -20,8 +18,11 @@ public class LoginManager {
     // An arrayList that saves each user's email and their failed attempt count together
     private final ArrayList<UserAttempt> failedAttempts = new ArrayList<>();
 
+    // An arrayList that saves the remaining block time for each blocked user
+    private final ArrayList<UserBlockTime> blockTimes = new ArrayList<>();
+
     /**
-     * Inner class that holds an email and its failed attempt count together, it just making it easier
+     * Inner class that holds an email and its failed attempt count together.
      */
     private static class UserAttempt {
         private final String email;
@@ -42,6 +43,29 @@ public class LoginManager {
 
         public void setCount(int count) {
             this.count = count;
+        }
+    }
+
+    // Inner class that holds an email and its remaining block time together
+    private static class UserBlockTime {
+        private final String email;
+        private int remainingSeconds;
+
+        UserBlockTime(String email, int remainingSeconds) {
+            this.email = email;
+            this.remainingSeconds = remainingSeconds;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public int getRemainingSeconds() {
+            return remainingSeconds;
+        }
+
+        public void setRemainingSeconds(int remainingSeconds) {
+            this.remainingSeconds = remainingSeconds;
         }
     }
 
@@ -71,8 +95,43 @@ public class LoginManager {
         failedAttempts.add(new UserAttempt(email, count));
     }
 
+    // Gets the remaining block time for a given email
+    public int getRemainingTime(String email) {
+        synchronized (this) {
+            for (UserBlockTime ubt : blockTimes) {
+                if (ubt.getEmail().equals(email)) {
+                    return ubt.getRemainingSeconds();
+                }
+            }
+        }
+        return 0;
+    }
+
+    // Sets the remaining block time for a given email
+    private void setRemainingTime(String email, int seconds) {
+        for (UserBlockTime ubt : blockTimes) {
+            if (ubt.getEmail().equals(email)) {
+                ubt.setRemainingSeconds(seconds);
+                return;
+            }
+        }
+        blockTimes.add(new UserBlockTime(email, seconds));
+    }
+
+    // Removes the remaining block time for a given email
+    private void removeRemainingTime(String email) {
+        blockTimes.removeIf(ubt -> ubt.getEmail().equals(email));
+    }
+
+    // Checks if a user is currently blocked
+    public boolean isBlocked(String email) {
+        synchronized (this) {
+            return blockedUsers.contains(email);
+        }
+    }
+
     /**
-     * Thread 1: updates a failed login attempt for the given email.
+     * Thread 1: Records a failed login attempt for the given email.
      * If attempts reach maxFailedAttempts, blocks the user for blockDuration seconds.
      * onCountdown is called every second with the remaining seconds.
      * onUnblocked is called when the block duration ends.
@@ -89,6 +148,7 @@ public class LoginManager {
                 if (attempts >= maxFailedAttempts) {
                     blockedUsers.add(email);
                     setFailedCount(email, 0);
+                    setRemainingTime(email, blockDuration);
                     shouldBlock = true;
                 }
             }
@@ -99,6 +159,9 @@ public class LoginManager {
                     int secondsLeft = blockDuration;
                     while (secondsLeft > 0) {
                         final int display = secondsLeft;
+                        synchronized (this) {
+                            setRemainingTime(email, display);
+                        }
                         javafx.application.Platform.runLater(() ->
                                 onCountdown.onTick(display)
                         );
@@ -112,6 +175,7 @@ public class LoginManager {
                 // Unblock the user
                 synchronized (this) {
                     blockedUsers.remove(email);
+                    removeRemainingTime(email);
                 }
 
                 // Notify UI that block is over

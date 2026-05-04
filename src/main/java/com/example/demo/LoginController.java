@@ -30,6 +30,9 @@ public class LoginController {
     @FXML
     private Label errorLabel;
 
+    // Tracks which email's countdown is currently being displayed on screen
+    private String activeCountdownEmail = "";
+
     // A list to store only the users that pass your strict validation rules
     private final ArrayList<User> validUsers = new ArrayList<>();
 
@@ -69,6 +72,15 @@ public class LoginController {
         // Grab the text the user actually typed into the boxes
         String inputUser = usernameField.getText();
         String inputPass = passwordField.getText();
+
+        // If user is already blocked, resume showing their countdown and stop
+        if (MainApp.getLoginManager().isBlocked(inputUser)) {
+            // Set this email as the active countdown so its thread updates the screen
+            activeCountdownEmail = inputUser;
+            int remaining = MainApp.getLoginManager().getRemainingTime(inputUser);
+            errorLabel.setText("You are blocked. Please wait " + remaining + " seconds.");
+            return;
+        }
 
         // First check if the email exists in our valid users list
         boolean emailExists = false;
@@ -111,20 +123,33 @@ public class LoginController {
                             errorLabel.setText("System Error: Could not load welcome screen.");
                         }
                     },
-                    // onBlocked - user is blocked, show blocked message
-                    () -> errorLabel.setText("You are blocked. Please wait.")
+                    // onBlocked - user is blocked, show remaining time
+                    () -> {
+                        int remaining = MainApp.getLoginManager().getRemainingTime(inputUser);
+                        errorLabel.setText("You are blocked. Please wait " + remaining + " seconds.");
+                    }
             );
         } else {
             // Email exists but wrong password - use Thread 1 to record failed attempt
+            activeCountdownEmail = inputUser;
             MainApp.getLoginManager().recordFailedAttempt(
                     inputUser,
                     // onError - wrong password, not yet blocked
                     () -> errorLabel.setText("user or password do not match"),
-                    // onCountdown - show countdown message every second
-                    secondsLeft -> errorLabel.setText("Too many failed attempts. Please wait "
-                            + secondsLeft + " seconds."),
-                    // onUnblocked - block is over, clear the message
-                    () -> errorLabel.setText("")
+                    // onCountdown - only update screen if this is the active email
+                    secondsLeft -> {
+                        if (inputUser.equals(activeCountdownEmail)) {
+                            errorLabel.setText("Too many failed attempts. Please wait "
+                                    + secondsLeft + " seconds.");
+                        }
+                    },
+                    // onUnblocked - block is over, clear message only if this is the active email
+                    () -> {
+                        if (inputUser.equals(activeCountdownEmail)) {
+                            errorLabel.setText("");
+                            activeCountdownEmail = "";
+                        }
+                    }
             );
         }
     }
