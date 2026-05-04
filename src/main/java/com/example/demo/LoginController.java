@@ -70,34 +70,62 @@ public class LoginController {
         String inputUser = usernameField.getText();
         String inputPass = passwordField.getText();
 
+        // First check if the email exists in our valid users list
+        boolean emailExists = false;
         boolean isMatch = false;
 
-        // Loop through our list of valid users to see if the credentials match
         for (User u : validUsers) {
-            if (u.getUsername().equals(inputUser) && u.getPassword().equals(inputPass)) {
-                isMatch = true;
-                break; // Stop looking once we find a match
+            if (u.getUsername().equals(inputUser)) {
+                emailExists = true;
+                if (u.getPassword().equals(inputPass)) {
+                    isMatch = true;
+                }
+                break;
             }
         }
 
-        if (isMatch) {
-            try {
-                // Credentials match! Load the visual layout for the welcome screen
-                Parent welcomeRoot = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("welcome.fxml")));
-
-                // Find the current window (Stage) based on the button that was clicked
-                Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
-
-                // Swap the old login scene for the new welcome scene
-                stage.setScene(new Scene(welcomeRoot));
-                stage.setTitle("Welcome");
-            } catch (Exception e) {
-                // Show the error on the screen instead of the console
-                errorLabel.setText("System Error: Could not load welcome screen.");
-            }
-        } else {
-            // Credentials don't match! Show the exact error text required by the lab
+        if (!emailExists) {
+            // Email not in valid users list - just show error, no counting
             errorLabel.setText("user or password do not match");
+            return;
+        }
+
+        if (isMatch) {
+            // Email and password correct - use Thread 2 to check if user is blocked
+            MainApp.getLoginManager().checkAndLogin(
+                    inputUser,
+                    // onAllowed - user is not blocked, open welcome screen
+                    () -> {
+                        try {
+                            // Credentials match! Load the visual layout for the welcome screen
+                            Parent welcomeRoot = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("welcome.fxml")));
+
+                            // Find the current window (Stage) based on the button that was clicked
+                            Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
+
+                            // Swap the old login scene for the new welcome scene
+                            stage.setScene(new Scene(welcomeRoot));
+                            stage.setTitle("Welcome");
+                        } catch (Exception e) {
+                            // Show the error on the screen instead of the console
+                            errorLabel.setText("System Error: Could not load welcome screen.");
+                        }
+                    },
+                    // onBlocked - user is blocked, show blocked message
+                    () -> errorLabel.setText("You are blocked. Please wait.")
+            );
+        } else {
+            // Email exists but wrong password - use Thread 1 to record failed attempt
+            MainApp.getLoginManager().recordFailedAttempt(
+                    inputUser,
+                    // onError - wrong password, not yet blocked
+                    () -> errorLabel.setText("user or password do not match"),
+                    // onCountdown - show countdown message every second
+                    secondsLeft -> errorLabel.setText("Too many failed attempts. Please wait "
+                            + secondsLeft + " seconds."),
+                    // onUnblocked - block is over, clear the message
+                    () -> errorLabel.setText("")
+            );
         }
     }
 }
